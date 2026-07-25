@@ -7,14 +7,6 @@ export const uploadResume = async (req, res) => {
       return res.status(400).json({ message: 'No file uploaded' });
     }
 
-    console.log('Received req.file:', {
-      originalname: req.file.originalname,
-      mimetype: req.file.mimetype,
-      size: req.file.size,
-      bufferLength: req.file.buffer ? req.file.buffer.length : 0,
-      isBuffer: Buffer.isBuffer(req.file.buffer)
-    });
-
     const rawText = await extractTextFromBuffer(req.file.buffer, req.file.mimetype);
 
     if (!rawText || rawText.trim().length < 50) {
@@ -39,5 +31,24 @@ export const uploadResume = async (req, res) => {
   } catch (error) {
     console.error('Error in uploadResume:', error);
     res.status(500).json({ message: error.message || 'Failed to parse and upload resume' });
+  }
+};
+
+export const getUserResumes = async (req, res) => {
+  try {
+    const resumes = await Resume.find({ userId: req.userId })
+      .select('_id originalFileName uploadedAt rawText')
+      .sort({ uploadedAt: -1 });
+
+    const formatted = resumes.map(r => ({
+      _id: r._id,
+      originalFileName: r.originalFileName,
+      uploadedAt: r.uploadedAt,
+      preview: r.rawText ? r.rawText.slice(0, 150) + '...' : ''
+    }));
+
+    res.json(formatted);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
