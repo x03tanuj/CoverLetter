@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import resumeRoutes from './routes/resumeRoutes.js';
+import coverLetterRoutes from './routes/coverLetterRoutes.js';
 
 dotenv.config();
 
@@ -16,6 +17,7 @@ app.use(express.json());
 
 app.use('/auth', authRoutes);
 app.use('/resume', resumeRoutes);
+app.use('/cover-letter', coverLetterRoutes);
 
 app.get('/', (req, res) => res.send('API running'));
 
