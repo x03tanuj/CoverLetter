@@ -3,6 +3,9 @@ import CoverLetter from '../models/CoverLetter.js';
 import Resume from '../models/Resume.js';
 import { generateCoverLetter } from '../services/llmService.js';
 
+// @desc    Generate new cover letter
+// @route   POST /cover-letter/generate
+// @access  Private
 export const generateCoverLetterController = async (req, res) => {
   try {
     const {
@@ -57,12 +60,105 @@ export const generateCoverLetterController = async (req, res) => {
     });
 
     const savedCoverLetter = await coverLetter.save();
-
     res.status(201).json(savedCoverLetter);
   } catch (error) {
     console.error('Error generating cover letter:', error);
     res.status(500).json({
       message: error.message || 'Failed to generate cover letter'
     });
+  }
+};
+
+// @desc    Get all cover letters for logged-in user
+// @route   GET /cover-letter
+// @access  Private
+export const getCoverLetters = async (req, res) => {
+  try {
+    const letters = await CoverLetter.find({ userId: req.userId }).sort({ createdAt: -1 });
+    res.json(letters);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get single cover letter by ID
+// @route   GET /cover-letter/:id
+// @access  Private
+export const getCoverLetterById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid cover letter ID format' });
+    }
+
+    const letter = await CoverLetter.findById(id);
+    if (!letter) {
+      return res.status(404).json({ message: 'Cover letter not found' });
+    }
+
+    if (letter.userId.toString() !== req.userId.toString()) {
+      return res.status(403).json({ message: 'Forbidden: Access denied' });
+    }
+
+    res.json(letter);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Update cover letter edited text / status
+// @route   PUT /cover-letter/:id
+// @access  Private
+export const updateCoverLetter = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { editedText, status } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid cover letter ID format' });
+    }
+
+    const letter = await CoverLetter.findById(id);
+    if (!letter) {
+      return res.status(404).json({ message: 'Cover letter not found' });
+    }
+
+    if (letter.userId.toString() !== req.userId.toString()) {
+      return res.status(403).json({ message: 'Forbidden: Access denied' });
+    }
+
+    if (editedText !== undefined) letter.editedText = editedText;
+    if (status !== undefined) letter.status = status;
+
+    const updatedLetter = await letter.save();
+    res.json(updatedLetter);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Delete cover letter
+// @route   DELETE /cover-letter/:id
+// @access  Private
+export const deleteCoverLetter = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid cover letter ID format' });
+    }
+
+    const letter = await CoverLetter.findById(id);
+    if (!letter) {
+      return res.status(404).json({ message: 'Cover letter not found' });
+    }
+
+    if (letter.userId.toString() !== req.userId.toString()) {
+      return res.status(403).json({ message: 'Forbidden: Access denied' });
+    }
+
+    await letter.deleteOne();
+    res.json({ message: 'Cover letter removed' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
