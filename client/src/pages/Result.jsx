@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { jsPDF } from 'jspdf';
 import API from '../services/api';
 import {
   Sparkles,
@@ -11,8 +12,7 @@ import {
   ArrowLeft,
   AlertCircle,
   Loader2,
-  Calendar,
-  Sliders,
+  Download,
   Award
 } from 'lucide-react';
 
@@ -117,6 +117,58 @@ const Result = () => {
     navigator.clipboard.writeText(currentText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
+  };
+
+  // Export PDF (21c)
+  const handleExportPDF = () => {
+    if (!currentText || !letter) return;
+
+    const doc = new jsPDF({
+      unit: 'pt',
+      format: 'a4'
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 50;
+    const maxLineWidth = pageWidth - margin * 2;
+
+    // Header Title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text(`${letter.jobTitle} - Cover Letter`, margin, 60);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Company: ${letter.company}  |  Date: ${new Date(letter.createdAt).toLocaleDateString()}`, margin, 78);
+
+    // Line separator
+    doc.setDrawColor(200);
+    doc.setLineWidth(1);
+    doc.line(margin, 90, pageWidth - margin, 90);
+
+    // Body text
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.setTextColor(30);
+
+    const lines = doc.splitTextToSize(currentText, maxLineWidth);
+    
+    let cursorY = 115;
+    const lineHeight = 16;
+
+    lines.forEach((line) => {
+      if (cursorY + lineHeight > pageHeight - margin) {
+        doc.addPage();
+        cursorY = margin;
+      }
+      doc.text(line, margin, cursorY);
+      cursorY += lineHeight;
+    });
+
+    const sanitizedCompany = letter.company.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+    doc.save(`cover-letter-${sanitizedCompany}.pdf`);
   };
 
   // Word count
@@ -228,7 +280,7 @@ const Result = () => {
           </div>
         </div>
 
-        {/* Toolbar Action Buttons (19c) */}
+        {/* Toolbar Action Buttons */}
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.25rem', alignItems: 'center' }}>
           
           {/* Save Button */}
@@ -258,7 +310,16 @@ const Result = () => {
             className="neo-btn"
           >
             {copied ? <Check size={16} color="green" /> : <Copy size={16} />}
-            <span>{copied ? 'Copied!' : 'Copy to Clipboard'}</span>
+            <span>{copied ? 'Copied!' : 'Copy Text'}</span>
+          </button>
+
+          {/* Export PDF Button (21b) */}
+          <button
+            onClick={handleExportPDF}
+            className="neo-btn neo-btn-primary"
+          >
+            <Download size={16} />
+            <span>Export PDF</span>
           </button>
 
           {/* Mark Final / Draft Toggle */}
@@ -272,7 +333,7 @@ const Result = () => {
           </button>
         </div>
 
-        {/* Editable Text Area (19b) */}
+        {/* Editable Text Area */}
         <div style={{ position: 'relative' }}>
           <textarea
             className="neo-input"
