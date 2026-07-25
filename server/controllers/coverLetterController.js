@@ -24,6 +24,13 @@ export const generateCoverLetterController = async (req, res) => {
       });
     }
 
+    // 23a. Backend Job Description Length Cap
+    if (jobDescriptionText.length > 12000) {
+      return res.status(400).json({
+        message: 'Job description is too long. Please cap your input under 12,000 characters (~2,000 words).'
+      });
+    }
+
     if (!mongoose.Types.ObjectId.isValid(resumeId)) {
       return res.status(400).json({ message: 'Invalid resumeId format' });
     }
@@ -35,6 +42,13 @@ export const generateCoverLetterController = async (req, res) => {
 
     if (resume.userId.toString() !== req.userId.toString()) {
       return res.status(403).json({ message: 'Forbidden: Resume does not belong to you' });
+    }
+
+    // 23d. Empty/Low quality rawText check guard
+    if (!resume.rawText || resume.rawText.trim().length < 50) {
+      return res.status(400).json({
+        message: 'The selected resume text is too short or empty. Please upload a clear text resume.'
+      });
     }
 
     const generatedText = await generateCoverLetter({
@@ -70,8 +84,6 @@ export const generateCoverLetterController = async (req, res) => {
 };
 
 // @desc    Get all cover letters for logged-in user
-// @route   GET /cover-letter
-// @access  Private
 export const getCoverLetters = async (req, res) => {
   try {
     const letters = await CoverLetter.find({ userId: req.userId }).sort({ createdAt: -1 });
@@ -82,8 +94,6 @@ export const getCoverLetters = async (req, res) => {
 };
 
 // @desc    Get single cover letter by ID
-// @route   GET /cover-letter/:id
-// @access  Private
 export const getCoverLetterById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -107,8 +117,6 @@ export const getCoverLetterById = async (req, res) => {
 };
 
 // @desc    Update cover letter edited text / status
-// @route   PUT /cover-letter/:id
-// @access  Private
 export const updateCoverLetter = async (req, res) => {
   try {
     const { id } = req.params;
@@ -138,8 +146,6 @@ export const updateCoverLetter = async (req, res) => {
 };
 
 // @desc    Delete cover letter
-// @route   DELETE /cover-letter/:id
-// @access  Private
 export const deleteCoverLetter = async (req, res) => {
   try {
     const { id } = req.params;
