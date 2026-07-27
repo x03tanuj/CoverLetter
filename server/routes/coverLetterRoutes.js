@@ -7,10 +7,11 @@ import {
   deleteCoverLetter
 } from '../controllers/coverLetterController.js';
 import authMiddleware from '../middleware/authMiddleware.js';
+import { generateLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
-router.post('/generate', authMiddleware, generateCoverLetterController);
+router.post('/generate', authMiddleware, generateLimiter, generateCoverLetterController);
 router.get('/', authMiddleware, getCoverLetters);
 router.get('/:id', authMiddleware, getCoverLetterById);
 router.put('/:id', authMiddleware, updateCoverLetter);
