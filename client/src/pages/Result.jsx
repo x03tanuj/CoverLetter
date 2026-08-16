@@ -121,6 +121,20 @@ const Result = () => {
     setTimeout(() => setCopied(false), 2500);
   };
 
+  // Helper to sanitize unicode text (NBSP, em-dashes, smart quotes) for clean jsPDF rendering
+  const sanitizeTextForPDF = (text) => {
+    if (!text) return '';
+    return text
+      .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, ' ')
+      .replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '')
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/[\u201C\u201D]/g, '"')
+      .replace(/[\u2013\u2014]/g, ' - ')
+      .replace(/\u2011/g, '-')
+      .replace(/[ \t]+/g, ' ')
+      .trim();
+  };
+
   // Export PDF - Formatted Standard Business Cover Letter
   const handleExportPDF = () => {
     if (!currentText || !letter) return;
@@ -132,7 +146,7 @@ const Result = () => {
 
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 72; // Standard 1 inch (72pt) margin
+    const margin = 54; // 0.75 inch (54pt) margin for elegant business letter presentation
     const contentWidth = pageWidth - margin * 2;
 
     let cursorY = margin;
@@ -145,27 +159,30 @@ const Result = () => {
     };
 
     // Candidate details from Auth user model
-    const candidateName = user?.name || 'Candidate Name';
-    const candidateEmail = user?.email || 'candidate@example.com';
-    
-    // TODO: Phone & Address fields are not present in current User model schema.
-    // Placeholders used to preserve complete business letter formatting layout.
-    const candidatePhone = user?.phone || '[Phone Number]';
-    const candidateAddress = user?.address || '[City, State, Zip]';
+    const candidateName = sanitizeTextForPDF(user?.name || 'Candidate Name');
+    const candidateEmail = sanitizeTextForPDF(user?.email || '');
+    const candidatePhone = user?.phone ? sanitizeTextForPDF(user.phone) : '';
+    const candidateAddress = user?.address ? sanitizeTextForPDF(user.address) : '';
 
-    // 1. Candidate Header (Name: 20pt Bold, Contact Line: 10pt Regular)
+    // Filter available contact fields to prevent printing raw bracket placeholders
+    const contactItems = [candidateEmail, candidatePhone, candidateAddress].filter(Boolean);
+
+    // 1. Candidate Header (Name: 18pt Bold, Contact Line: 10pt Regular)
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(20);
+    doc.setFontSize(18);
     doc.setTextColor(0, 0, 0);
     doc.text(candidateName, margin, cursorY);
-    cursorY += 24;
+    cursorY += 22;
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(60, 60, 60);
-    const contactLine = `${candidateEmail}  |  ${candidatePhone}  |  ${candidateAddress}`;
-    doc.text(contactLine, margin, cursorY);
-    cursorY += 28;
+    if (contactItems.length > 0) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(80, 80, 80);
+      doc.text(contactItems.join('  |  '), margin, cursorY);
+      cursorY += 24;
+    } else {
+      cursorY += 10;
+    }
 
     // 2. Date Block
     checkPageBreak(30);
@@ -181,35 +198,39 @@ const Result = () => {
     cursorY += 24;
 
     // 3. Recipient Block
-    const hiringManager = letter.hiringManager || 'Hiring Manager';
-    const companyName = letter.company || 'Company Name';
-    const companyAddress = letter.companyAddress || '[Company Address]';
+    const hiringManager = letter.hiringManager ? sanitizeTextForPDF(letter.hiringManager) : 'Hiring Manager';
+    const companyName = sanitizeTextForPDF(letter.company || 'Company Name');
+    const companyAddress = letter.companyAddress ? sanitizeTextForPDF(letter.companyAddress) : '';
 
     checkPageBreak(50);
     doc.text(hiringManager, margin, cursorY);
     cursorY += 16;
     doc.text(companyName, margin, cursorY);
     cursorY += 16;
-    doc.text(companyAddress, margin, cursorY);
-    cursorY += 24;
+    if (companyAddress) {
+      doc.text(companyAddress, margin, cursorY);
+      cursorY += 16;
+    }
+    cursorY += 8;
 
     // 4. Salutation
     checkPageBreak(25);
     const salutation = letter.hiringManager
-      ? `Dear ${letter.hiringManager},`
+      ? `Dear ${sanitizeTextForPDF(letter.hiringManager)},`
       : 'Dear Hiring Manager,';
     doc.text(salutation, margin, cursorY);
     cursorY += 24;
 
     // 5. Letter Body (paragraphs with spacing & line wrapping)
-    const paragraphs = currentText
+    const sanitizedFullText = sanitizeTextForPDF(currentText);
+    const paragraphs = sanitizedFullText
       .split(/\n\s*\n/)
       .map((p) => p.trim())
       .filter(Boolean);
 
     const fontSize = 11;
     const lineHeight = 16;
-    const paragraphSpacing = 12;
+    const paragraphSpacing = 14;
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(fontSize);
@@ -230,7 +251,7 @@ const Result = () => {
     // 6. Sign-off / Closing
     checkPageBreak(60);
     doc.text('Sincerely,', margin, cursorY);
-    cursorY += 40; // Space for physical signature
+    cursorY += 36; // Space for physical signature
 
     checkPageBreak(20);
     doc.setFont('helvetica', 'bold');
