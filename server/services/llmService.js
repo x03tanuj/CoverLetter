@@ -54,9 +54,13 @@ export const generateCoverLetter = async ({
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userPrompt }
       ],
-      model: 'llama-3.3-70b-versatile',
-      temperature: 0.7,
-      max_tokens: 1024
+      model: 'openai/gpt-oss-120b',
+      stream: false,
+      temperature: 1,
+      max_completion_tokens: 2048,
+      top_p: 1,
+      reasoning_effort: 'medium',
+      stop: null
     });
 
     const generatedText = completion.choices[0]?.message?.content;
