@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import API from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import {
   Sparkles,
   Save,
@@ -19,6 +20,7 @@ import {
 const Result = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [letter, setLetter] = useState(null);
   const [currentText, setCurrentText] = useState('');
@@ -119,7 +121,7 @@ const Result = () => {
     setTimeout(() => setCopied(false), 2500);
   };
 
-  // Export PDF (21c)
+  // Export PDF - Formatted Standard Business Cover Letter
   const handleExportPDF = () => {
     if (!currentText || !letter) return;
 
@@ -130,44 +132,113 @@ const Result = () => {
 
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 50;
-    const maxLineWidth = pageWidth - margin * 2;
+    const margin = 72; // Standard 1 inch (72pt) margin
+    const contentWidth = pageWidth - margin * 2;
 
-    // Header Title
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.text(`${letter.jobTitle} - Cover Letter`, margin, 60);
+    let cursorY = margin;
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Company: ${letter.company}  |  Date: ${new Date(letter.createdAt).toLocaleDateString()}`, margin, 78);
-
-    // Line separator
-    doc.setDrawColor(200);
-    doc.setLineWidth(1);
-    doc.line(margin, 90, pageWidth - margin, 90);
-
-    // Body text
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(11);
-    doc.setTextColor(30);
-
-    const lines = doc.splitTextToSize(currentText, maxLineWidth);
-    
-    let cursorY = 115;
-    const lineHeight = 16;
-
-    lines.forEach((line) => {
-      if (cursorY + lineHeight > pageHeight - margin) {
+    const checkPageBreak = (neededHeight) => {
+      if (cursorY + neededHeight > pageHeight - margin) {
         doc.addPage();
         cursorY = margin;
       }
-      doc.text(line, margin, cursorY);
-      cursorY += lineHeight;
+    };
+
+    // Candidate details from Auth user model
+    const candidateName = user?.name || 'Candidate Name';
+    const candidateEmail = user?.email || 'candidate@example.com';
+    
+    // TODO: Phone & Address fields are not present in current User model schema.
+    // Placeholders used to preserve complete business letter formatting layout.
+    const candidatePhone = user?.phone || '[Phone Number]';
+    const candidateAddress = user?.address || '[City, State, Zip]';
+
+    // 1. Candidate Header (Name: 20pt Bold, Contact Line: 10pt Regular)
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(0, 0, 0);
+    doc.text(candidateName, margin, cursorY);
+    cursorY += 24;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(60, 60, 60);
+    const contactLine = `${candidateEmail}  |  ${candidatePhone}  |  ${candidateAddress}`;
+    doc.text(contactLine, margin, cursorY);
+    cursorY += 28;
+
+    // 2. Date Block
+    checkPageBreak(30);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    const formattedDate = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    doc.text(formattedDate, margin, cursorY);
+    cursorY += 24;
+
+    // 3. Recipient Block
+    const hiringManager = letter.hiringManager || 'Hiring Manager';
+    const companyName = letter.company || 'Company Name';
+    const companyAddress = letter.companyAddress || '[Company Address]';
+
+    checkPageBreak(50);
+    doc.text(hiringManager, margin, cursorY);
+    cursorY += 16;
+    doc.text(companyName, margin, cursorY);
+    cursorY += 16;
+    doc.text(companyAddress, margin, cursorY);
+    cursorY += 24;
+
+    // 4. Salutation
+    checkPageBreak(25);
+    const salutation = letter.hiringManager
+      ? `Dear ${letter.hiringManager},`
+      : 'Dear Hiring Manager,';
+    doc.text(salutation, margin, cursorY);
+    cursorY += 24;
+
+    // 5. Letter Body (paragraphs with spacing & line wrapping)
+    const paragraphs = currentText
+      .split(/\n\s*\n/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+
+    const fontSize = 11;
+    const lineHeight = 16;
+    const paragraphSpacing = 12;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(fontSize);
+    doc.setTextColor(0, 0, 0);
+
+    paragraphs.forEach((paragraph) => {
+      const wrappedLines = doc.splitTextToSize(paragraph, contentWidth);
+
+      wrappedLines.forEach((line) => {
+        checkPageBreak(lineHeight);
+        doc.text(line, margin, cursorY);
+        cursorY += lineHeight;
+      });
+
+      cursorY += paragraphSpacing;
     });
 
-    const sanitizedCompany = letter.company.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+    // 6. Sign-off / Closing
+    checkPageBreak(60);
+    doc.text('Sincerely,', margin, cursorY);
+    cursorY += 40; // Space for physical signature
+
+    checkPageBreak(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text(candidateName, margin, cursorY);
+
+    const sanitizedCompany = (letter.company || 'company')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .toLowerCase();
     doc.save(`cover-letter-${sanitizedCompany}.pdf`);
   };
 
