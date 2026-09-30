@@ -38,10 +38,22 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (name, email, password) => {
     const { data } = await API.post('/auth/register', { name, email, password });
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('user', JSON.stringify(data.user));
-    setToken(data.token);
-    setUser(data.user);
+    return data;
+  };
+
+  const verifyOtp = async (email, otp) => {
+    const { data } = await API.post('/auth/verify-otp', { email, otp });
+    if (data.token) {
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      setToken(data.token);
+      setUser(data.user);
+    }
+    return data;
+  };
+
+  const resendOtp = async (email) => {
+    const { data } = await API.post('/auth/resend-otp', { email });
     return data;
   };
 
@@ -60,6 +72,8 @@ export const AuthProvider = ({ children }) => {
         loading,
         login,
         register,
+        verifyOtp,
+        resendOtp,
         logout,
         isAuthenticated: !!token
       }}

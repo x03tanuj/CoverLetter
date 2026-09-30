@@ -7,6 +7,7 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [unverifiedEmail, setUnverifiedEmail] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { login } = useAuth();
@@ -15,13 +16,18 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setUnverifiedEmail(null);
     setIsSubmitting(true);
 
     try {
       await login(email, password);
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid credentials. Please try again.');
+      const msg = err.response?.data?.message || 'Invalid credentials. Please try again.';
+      setError(msg);
+      if (err.response?.data?.requiresOtp) {
+        setUnverifiedEmail(err.response?.data?.email || email);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -30,7 +36,7 @@ const Login = () => {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', backgroundColor: 'var(--bg-main)' }}>
       <div style={{ width: '100%', maxWidth: '440px' }}>
-        
+
         {/* Header Branding */}
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
           <div className="neo-badge neo-badge-coral" style={{ marginBottom: '0.75rem' }}>
@@ -57,10 +63,20 @@ const Login = () => {
               fontSize: '0.85rem',
               fontWeight: '600',
               display: 'flex',
-              alignItems: 'center',
+              flexDirection: 'column',
               gap: '0.5rem'
             }}>
-              <AlertCircle size={16} /> {error}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <AlertCircle size={16} /> {error}
+              </div>
+              {unverifiedEmail && (
+                <Link
+                  to={`/verify-otp?email=${encodeURIComponent(unverifiedEmail)}`}
+                  style={{ color: '#1A1D20', textDecoration: 'underline', fontWeight: '700', fontSize: '0.85rem', marginTop: '4px' }}
+                >
+                  Click here to enter your verification code →
+                </Link>
+              )}
             </div>
           )}
 
@@ -78,7 +94,12 @@ const Login = () => {
             </div>
 
             <div style={{ marginBottom: '1.5rem' }}>
-              <label className="neo-label">Password</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                <label className="neo-label" style={{ margin: 0 }}>Password</label>
+                <Link to="/forgot-password" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '700', textDecoration: 'underline' }}>
+                  Forgot Password?
+                </Link>
+              </div>
               <input
                 type="password"
                 className="neo-input"

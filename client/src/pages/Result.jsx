@@ -30,6 +30,7 @@ const Result = () => {
   // Action Loading States
   const [saving, setSaving] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
 
@@ -121,146 +122,155 @@ const Result = () => {
     setTimeout(() => setCopied(false), 2500);
   };
 
-  // Helper to sanitize unicode text (NBSP, em-dashes, smart quotes) for clean jsPDF rendering
+  // Helper to sanitize unicode and markdown text for clean jsPDF rendering
   const sanitizeTextForPDF = (text) => {
     if (!text) return '';
     return text
+      .replace(/\r\n|\r/g, '\n')
       .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, ' ')
       .replace(/[\u200B-\u200D\uFEFF\u00AD]/g, '')
       .replace(/[\u2018\u2019]/g, "'")
       .replace(/[\u201C\u201D]/g, '"')
-      .replace(/[\u2013\u2014]/g, ' - ')
-      .replace(/\u2011/g, '-')
+      .replace(/[\u2013\u2014]/g, '-')
+      .replace(/\u2022/g, '-')
+      .replace(/\u2026/g, '...')
+      .replace(/\*\*(.+?)\*\*/g, (_match, p1) => p1)
+      .replace(/\*([^*]+)\*/g, (_match, p1) => p1)
+      .replace(/_([^_]+)_/g, (_match, p1) => p1)
+      .replace(/^#+\s+/gm, '')
+      .replace(/^[*\-]\s+/gm, '- ')
       .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
       .trim();
   };
 
   // Export PDF - Formatted Standard Business Cover Letter
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!currentText || !letter) return;
 
-    const doc = new jsPDF({
-      unit: 'pt',
-      format: 'a4'
-    });
+    setExporting(true);
+    setError('');
 
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 54; // 0.75 inch (54pt) margin for elegant business letter presentation
-    const contentWidth = pageWidth - margin * 2;
-
-    let cursorY = margin;
-
-    const checkPageBreak = (neededHeight) => {
-      if (cursorY + neededHeight > pageHeight - margin) {
-        doc.addPage();
-        cursorY = margin;
-      }
-    };
-
-    // Candidate details from Auth user model
-    const candidateName = sanitizeTextForPDF(user?.name || 'Candidate Name');
-    const candidateEmail = sanitizeTextForPDF(user?.email || '');
-    const candidatePhone = user?.phone ? sanitizeTextForPDF(user.phone) : '';
-    const candidateAddress = user?.address ? sanitizeTextForPDF(user.address) : '';
-
-    // Filter available contact fields to prevent printing raw bracket placeholders
-    const contactItems = [candidateEmail, candidatePhone, candidateAddress].filter(Boolean);
-
-    // 1. Candidate Header (Name: 18pt Bold, Contact Line: 10pt Regular)
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(18);
-    doc.setTextColor(0, 0, 0);
-    doc.text(candidateName, margin, cursorY);
-    cursorY += 22;
-
-    if (contactItems.length > 0) {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
-      doc.setTextColor(80, 80, 80);
-      doc.text(contactItems.join('  |  '), margin, cursorY);
-      cursorY += 24;
-    } else {
-      cursorY += 10;
-    }
-
-    // 2. Date Block
-    checkPageBreak(30);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(11);
-    doc.setTextColor(0, 0, 0);
-    const formattedDate = new Date().toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-    doc.text(formattedDate, margin, cursorY);
-    cursorY += 24;
-
-    // 3. Recipient Block
-    const hiringManager = letter.hiringManager ? sanitizeTextForPDF(letter.hiringManager) : 'Hiring Manager';
-    const companyName = sanitizeTextForPDF(letter.company || 'Company Name');
-    const companyAddress = letter.companyAddress ? sanitizeTextForPDF(letter.companyAddress) : '';
-
-    checkPageBreak(50);
-    doc.text(hiringManager, margin, cursorY);
-    cursorY += 16;
-    doc.text(companyName, margin, cursorY);
-    cursorY += 16;
-    if (companyAddress) {
-      doc.text(companyAddress, margin, cursorY);
-      cursorY += 16;
-    }
-    cursorY += 8;
-
-    // 4. Salutation
-    checkPageBreak(25);
-    const salutation = letter.hiringManager
-      ? `Dear ${sanitizeTextForPDF(letter.hiringManager)},`
-      : 'Dear Hiring Manager,';
-    doc.text(salutation, margin, cursorY);
-    cursorY += 24;
-
-    // 5. Letter Body (paragraphs with spacing & line wrapping)
-    const sanitizedFullText = sanitizeTextForPDF(currentText);
-    const paragraphs = sanitizedFullText
-      .split(/\n\s*\n/)
-      .map((p) => p.trim())
-      .filter(Boolean);
-
-    const fontSize = 11;
-    const lineHeight = 16;
-    const paragraphSpacing = 14;
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(fontSize);
-    doc.setTextColor(0, 0, 0);
-
-    paragraphs.forEach((paragraph) => {
-      const wrappedLines = doc.splitTextToSize(paragraph, contentWidth);
-
-      wrappedLines.forEach((line) => {
-        checkPageBreak(lineHeight);
-        doc.text(line, margin, cursorY);
-        cursorY += lineHeight;
+    try {
+      const doc = new jsPDF({
+        unit: 'pt',
+        format: 'a4'
       });
 
-      cursorY += paragraphSpacing;
-    });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 50; // Standard 50pt margin (~0.7in)
+      const contentWidth = pageWidth - margin * 2;
 
-    // 6. Sign-off / Closing
-    checkPageBreak(60);
-    doc.text('Sincerely,', margin, cursorY);
-    cursorY += 36; // Space for physical signature
+      let cursorY = margin;
 
-    checkPageBreak(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text(candidateName, margin, cursorY);
+      const checkPageBreak = (neededHeight) => {
+        if (cursorY + neededHeight > pageHeight - margin - 20) {
+          doc.addPage();
+          cursorY = margin;
+        }
+      };
 
-    const sanitizedCompany = (letter.company || 'company')
-      .replace(/[^a-zA-Z0-9_-]/g, '_')
-      .toLowerCase();
-    doc.save(`cover-letter-${sanitizedCompany}.pdf`);
+      // 1. Candidate Header (Name & Contact Email)
+      const candidateName = user?.name ? sanitizeTextForPDF(user.name) : 'Applicant';
+      const candidateEmail = user?.email ? sanitizeTextForPDF(user.email) : '';
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor(17, 24, 39);
+      doc.text(candidateName, margin, cursorY);
+      cursorY += 18;
+
+      if (candidateEmail) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9.5);
+        doc.setTextColor(75, 85, 99);
+        doc.text(candidateEmail, margin, cursorY);
+        cursorY += 14;
+      }
+
+      // 2. Subtle Divider Line
+      doc.setDrawColor(229, 231, 235);
+      doc.setLineWidth(0.75);
+      doc.line(margin, cursorY, pageWidth - margin, cursorY);
+      cursorY += 16;
+
+      // 3. Metadata Line: Date & Target Info
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(107, 114, 128);
+      const formattedDate = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      doc.text(formattedDate, margin, cursorY);
+
+      const targetInfo = letter.jobTitle && letter.company
+        ? `Position: ${letter.jobTitle} @ ${letter.company}`
+        : letter.company ? `Company: ${letter.company}` : '';
+
+      if (targetInfo) {
+        doc.text(targetInfo, pageWidth - margin, cursorY, { align: 'right' });
+      }
+      cursorY += 22;
+
+      // 4. Letter Body (paragraphs with clean line wrapping and standard spacing)
+      const cleanText = sanitizeTextForPDF(currentText);
+      const paragraphs = cleanText
+        .split(/\n\s*\n/)
+        .map((p) => p.trim())
+        .filter(Boolean);
+
+      const fontSize = 10.5;
+      const lineHeight = 15;
+      const paragraphSpacing = 10;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(fontSize);
+      doc.setTextColor(31, 41, 55);
+
+      paragraphs.forEach((para, pIdx) => {
+        const lines = para.split('\n');
+        lines.forEach((lineText) => {
+          const wrappedLines = doc.splitTextToSize(lineText.trim(), contentWidth);
+          wrappedLines.forEach((line) => {
+            checkPageBreak(lineHeight);
+            doc.text(line, margin, cursorY);
+            cursorY += lineHeight;
+          });
+        });
+
+        if (pIdx < paragraphs.length - 1) {
+          cursorY += paragraphSpacing;
+        }
+      });
+
+      // 5. Multi-page Pagination (if applicable)
+      const totalPages = doc.internal.getNumberOfPages();
+      if (totalPages > 1) {
+        for (let i = 1; i <= totalPages; i++) {
+          doc.setPage(i);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8.5);
+          doc.setTextColor(156, 163, 175);
+          doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 25, { align: 'center' });
+        }
+      }
+
+      const sanitizedCompany = (letter.company || 'cover_letter')
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .toLowerCase();
+      doc.save(`cover-letter-${sanitizedCompany}.pdf`);
+
+      setSaveSuccessMsg('PDF downloaded successfully!');
+      setTimeout(() => setSaveSuccessMsg(''), 3000);
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+      setError('Failed to generate PDF. Please try again.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   // Word count
@@ -405,13 +415,14 @@ const Result = () => {
             <span>{copied ? 'Copied!' : 'Copy Text'}</span>
           </button>
 
-          {/* Export PDF Button (21b) */}
+          {/* Export PDF Button */}
           <button
             onClick={handleExportPDF}
             className="neo-btn neo-btn-primary"
+            disabled={exporting}
           >
-            <Download size={16} />
-            <span>Export PDF</span>
+            {exporting ? <Loader2 size={16} className="spin" /> : <Download size={16} />}
+            <span>{exporting ? 'Exporting...' : 'Export PDF'}</span>
           </button>
 
           {/* Mark Final / Draft Toggle */}

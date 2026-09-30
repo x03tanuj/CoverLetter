@@ -19,8 +19,9 @@ const Register = () => {
     setIsSubmitting(true);
 
     try {
-      await register(name, email, password);
-      navigate('/');
+      const res = await register(name, email, password);
+      const targetEmail = res?.email || email;
+      navigate(`/verify-otp?email=${encodeURIComponent(targetEmail)}`);
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.');
     } finally {
@@ -31,7 +32,7 @@ const Register = () => {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', backgroundColor: 'var(--bg-main)' }}>
       <div style={{ width: '100%', maxWidth: '440px' }}>
-        
+
         {/* Header Branding */}
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
           <div className="neo-badge neo-badge-teal" style={{ marginBottom: '0.75rem' }}>

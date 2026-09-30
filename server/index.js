@@ -13,9 +13,6 @@ dotenv.config();
 const app = express();
 app.set('trust proxy', 1);
 
-// Connect Database
-connectDB();
-
 // 4. Security Headers
 app.use(helmet());
 
@@ -56,6 +53,9 @@ app.use('/resume', resumeRoutes);
 app.use('/cover-letter', coverLetterRoutes);
 
 app.get('/', (req, res) => res.send('API running'));
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
 
 // 7. Global Express Error Handling Middleware
 app.use((err, req, res, next) => {
@@ -67,4 +67,13 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+const startServer = async () => {
+  await connectDB();
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+};
+
+startServer().catch((error) => {
+  console.error(`Server startup failed: ${error.message}`);
+  process.exit(1);
+});
