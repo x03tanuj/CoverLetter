@@ -15,6 +15,13 @@ Open the client at <http://localhost:5471>. The API health endpoint is
 <http://localhost:4000/health>, and MongoDB is available at
 `mongodb://localhost:27017/coverletter`.
 
+On a VPS, create a `.env` file next to `docker-compose.yml` and set
+`PUBLIC_HOST` to the VPS public IP or domain before starting Compose:
+
+```env
+PUBLIC_HOST=54.146.223.117
+```
+
 Stop the stack:
 
 ```bash

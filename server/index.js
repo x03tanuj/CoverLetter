@@ -22,7 +22,8 @@ const allowedOrigins = [
   process.env.VITE_API_URL,
   process.env.FRONTEND_URL,
   'http://localhost:5471',
-  'http://localhost:5472'
+  'http://localhost:5472',
+  process.env.PUBLIC_HOST ? `http://${process.env.PUBLIC_HOST}:5471` : null
 ].filter(Boolean);
 
 app.use(cors({

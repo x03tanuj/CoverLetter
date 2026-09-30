@@ -21,7 +21,7 @@ services:
       MONGO_URI: mongodb://mongo:27017/coverletter
       JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-me}
       LLM_PROVIDER: ${LLM_PROVIDER:-mock}
-      CLIENT_URL: http://localhost:5471
+      CLIENT_URL: http://${PUBLIC_HOST:-localhost}:5471
     ports:
       - "4000:4000"
     depends_on:
@@ -32,7 +32,7 @@ services:
     build:
       context: ./client
       args:
-        VITE_API_URL: http://localhost:4000
+        VITE_API_URL: ""
     restart: unless-stopped
     ports:
       - "5471:3000"
