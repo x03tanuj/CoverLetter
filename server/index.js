@@ -24,7 +24,7 @@ const allowedOrigins = [
   'http://localhost:5471',
   'http://localhost:5472',
   process.env.PUBLIC_HOST ? `http://${process.env.PUBLIC_HOST}:5471` : null
-].filter(Boolean);
+].filter(Boolean).flatMap((origin) => origin.split(',').map((value) => value.trim()));
 
 app.use(cors({
   origin: (origin, callback) => {
